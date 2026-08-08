@@ -282,14 +282,28 @@ class TPLinkEXClient(TPLinkMRClientBase):
 
         try:
             acts = [self.ActItem(self.ActItem.GL, 'DEV2_LTE_SERVING_CELL_INFO',
-                                 attrs=['networkType', 'signalStrength', 'SSRSRP', 'SSRSRQ', 'SSSINR'])]
+                                 attrs=['networkType', 'cellConnectionStatus', 'signalStrength',
+                                        'SSRSRP', 'SSRSRQ', 'SSSINR'])]
             _, values = self.req_act(acts)
 
-            # Each entry in serving_cell_info_list is one RAT. Match on active networkType.
+            connected_cells = [c for c in values[0] if c.get('cellConnectionStatus') == '1']
+
+            # Matching on status.network_type (from DEV2_LTE_LINK_CFG) is unreliable: that
+            # field reflects the router's overall connection type, which does not always
+            # correspond 1:1 to an entry in the serving cell list - e.g. after losing 5G/NR
+            # anchoring and falling back to LTE-only carrier aggregation, no serving cell
+            # entry matches the stale network_type, so this used to silently fall through to
+            # the DEV2_LTE_NET_STATUS values, which read 0 in that same scenario.
+            # cellConnectionStatus=='1' identifies the actually-connected cell(s) directly,
+            # same approach as get_lte_serving_cells(). Prefer NR (5G) when anchored, since
+            # that's the actual carrying RAT; fall back to LTE when there's no NR cell, and
+            # finally to whichever connected cell is reported first if neither is present.
             active_serving_cell = next(
-                (c for c in values[0]
-                 if int(c.get('networkType', -1)) == status.network_type),
-                None,
+                (c for c in connected_cells if int(c.get('networkType', -1)) == 8),
+                next(
+                    (c for c in connected_cells if int(c.get('networkType', -1)) == 3),
+                    connected_cells[0] if connected_cells else None,
+                ),
             )
             if active_serving_cell is not None:
                 # Per-RAT signal from DEV2_LTE_SERVING_CELL_INFO

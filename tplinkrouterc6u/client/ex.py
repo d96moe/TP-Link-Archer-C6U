@@ -295,12 +295,15 @@ class TPLinkEXClient(TPLinkMRClientBase):
             # entry matches the stale network_type, so this used to silently fall through to
             # the DEV2_LTE_NET_STATUS values, which read 0 in that same scenario.
             # cellConnectionStatus=='1' identifies the actually-connected cell(s) directly,
-            # same approach as get_lte_serving_cells(). Prefer the LTE anchor cell (always
-            # present) so this doesn't depend on which RATs are currently aggregated; fall
-            # back to whichever connected cell is reported first if no LTE entry is present.
+            # same approach as get_lte_serving_cells(). Prefer NR (5G) when anchored, since
+            # that's the actual carrying RAT; fall back to LTE when there's no NR cell, and
+            # finally to whichever connected cell is reported first if neither is present.
             active_serving_cell = next(
-                (c for c in connected_cells if int(c.get('networkType', -1)) == 3),
-                connected_cells[0] if connected_cells else None,
+                (c for c in connected_cells if int(c.get('networkType', -1)) == 8),
+                next(
+                    (c for c in connected_cells if int(c.get('networkType', -1)) == 3),
+                    connected_cells[0] if connected_cells else None,
+                ),
             )
             if active_serving_cell is not None:
                 # Per-RAT signal from DEV2_LTE_SERVING_CELL_INFO

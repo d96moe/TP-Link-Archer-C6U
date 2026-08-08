@@ -502,7 +502,14 @@ class TPLinkEXClient(TPLinkMRClientBase):
 
         cells = []
         for c in raw_cells:
-            if c.get('cellConnectionStatus') != '1':
+            # cellConnectionStatus: '0' = not connected (neighbor/candidate cell), '1' =
+            # primary/anchor cell, '2' = secondary carrier-aggregated cell. Previously only
+            # '1' was kept, which silently dropped any actively-aggregated secondary cell
+            # (e.g. a second LTE band in carrier aggregation) from the result entirely -
+            # confirmed live on NX200 hardware: an aggregated B20 secondary cell reports
+            # cellConnectionStatus '2', not '1'.
+            status = c.get('cellConnectionStatus')
+            if status not in ('1', '2'):
                 continue
             bandwidth = clean_int(c.get('downBandWidth'))
             cells.append(ServingCell(
@@ -518,6 +525,7 @@ class TPLinkEXClient(TPLinkMRClientBase):
                 resource_blocks=clean_int(c.get('numRbs')),
                 rsrp=clean_int(c.get('RSRP')),
                 rsrq=clean_int(c.get('RSRQ')),
+                connection_status=int(status),
             ))
         return cells
 

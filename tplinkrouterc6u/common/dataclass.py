@@ -339,6 +339,8 @@ class ServingCell:
     resource_blocks: int | None = None
     rsrp: int | None = None
     rsrq: int | None = None
+    connection_status: int | None = None
+    """1 = primary/anchor cell, 2 = secondary (carrier-aggregated) cell."""
 
 
 @dataclass
